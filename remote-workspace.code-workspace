@@ -1,0 +1,106 @@
+{
+    "folders": [
+        {
+            "name": "🤖 Gemini GitHub Integration",
+            "path": "./gemini-github-integration"
+        },
+        {
+            "name": "☕ Java Enterprise Project", 
+            "path": "./java-project"
+        },
+        {
+            "name": "📁 Root",
+            "path": "."
+        }
+    ],
+    "settings": {
+        "python.defaultInterpreterPath": "./gemini-github-integration/venv/bin/python",
+        "java.jdt.ls.java.home": "/usr/lib/jvm/java-21-openjdk-amd64",
+        "maven.executable.path": "/usr/bin/mvn",
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "files.exclude": {
+            "**/target": true,
+            "**/__pycache__": true,
+            "**/venv": false,
+            "**/.git": false
+        },
+        "search.exclude": {
+            "**/target": true,
+            "**/venv": true
+        }
+    },
+    "tasks": {
+        "version": "2.0.0",
+        "tasks": [
+            {
+                "label": "Java: Build",
+                "type": "shell",
+                "command": "mvn",
+                "args": ["clean", "compile"],
+                "group": "build",
+                "options": {
+                    "cwd": "${workspaceFolder}/java-project"
+                }
+            },
+            {
+                "label": "Java: Test",
+                "type": "shell",
+                "command": "mvn",
+                "args": ["test"],
+                "group": "test",
+                "options": {
+                    "cwd": "${workspaceFolder}/java-project"
+                }
+            },
+            {
+                "label": "Python: Install Dependencies",
+                "type": "shell",
+                "command": "pip",
+                "args": ["install", "-r", "requirements.txt"],
+                "group": "build",
+                "options": {
+                    "cwd": "${workspaceFolder}/gemini-github-integration"
+                }
+            },
+            {
+                "label": "Gemini: Run Bot",
+                "type": "shell",
+                "command": "python",
+                "args": ["gemini_github_bot.py"],
+                "group": "build",
+                "options": {
+                    "cwd": "${workspaceFolder}/gemini-github-integration"
+                }
+            },
+            {
+                "label": "Setup: All Projects",
+                "type": "shell",
+                "command": "./remote-work-setup.sh",
+                "group": "build",
+                "options": {
+                    "cwd": "${workspaceFolder}"
+                }
+            }
+        ]
+    },
+    "launch": {
+        "version": "0.2.0",
+        "configurations": [
+            {
+                "name": "Java: Debug App",
+                "type": "java",
+                "request": "launch",
+                "mainClass": "com.example.App",
+                "projectName": "enterprise-java-app"
+            },
+            {
+                "name": "Python: Debug Gemini Bot",
+                "type": "debugpy",
+                "request": "launch",
+                "program": "${workspaceFolder}/gemini-github-integration/gemini_github_bot.py",
+                "console": "integratedTerminal",
+                "cwd": "${workspaceFolder}/gemini-github-integration"
+            }
+        ]
+    }
+}

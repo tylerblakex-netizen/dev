@@ -1,0 +1,103 @@
+name: Deploy Gemini GitHub Integration
+
+on:
+  push:
+    branches: [ main ]
+    paths: 
+      - 'gemini-github-integration/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'gemini-github-integration/**'
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  FUNCTION_NAME: gemini-github-webhook
+  REGION: us-central1
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      working-directory: ./gemini-github-integration
+      run: |
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio
+    
+    - name: Run tests
+      working-directory: ./gemini-github-integration
+      run: pytest tests/ -v
+    
+    - name: Lint code
+      working-directory: ./gemini-github-integration
+      run: |
+        flake8 *.py --max-line-length=88
+        black --check *.py
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    permissions:
+      contents: read
+      id-token: write
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+    
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+    
+    - name: Deploy Cloud Function
+      working-directory: ./gemini-github-integration
+      run: |
+        gcloud functions deploy $FUNCTION_NAME \
+          --runtime python311 \
+          --trigger-http \
+          --allow-unauthenticated \
+          --entry-point github_webhook_handler \
+          --source . \
+          --region $REGION \
+          --set-env-vars PROJECT_ID=$PROJECT_ID,LOCATION=$REGION \
+          --set-secrets GITHUB_TOKEN=github-token:latest
+    
+    - name: Get function URL
+      run: |
+        FUNCTION_URL=$(gcloud functions describe $FUNCTION_NAME --region=$REGION --format="value(httpsTrigger.url)")
+        echo "Function deployed at: $FUNCTION_URL"
+        echo "FUNCTION_URL=$FUNCTION_URL" >> $GITHUB_ENV
+    
+    - name: Update webhook (if configured)
+      if: ${{ secrets.WEBHOOK_REPO }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        WEBHOOK_REPO: ${{ secrets.WEBHOOK_REPO }}
+      run: |
+        # Update or create webhook for the specified repository
+        curl -X POST \
+          -H "Authorization: token $GITHUB_TOKEN" \
+          -H "Accept: application/vnd.github.v3+json" \
+          https://api.github.com/repos/$WEBHOOK_REPO/hooks \
+          -d '{
+            "name": "web",
+            "active": true,
+            "events": ["pull_request", "issues", "push", "release"],
+            "config": {
+              "url": "'$FUNCTION_URL'",
+              "content_type": "json"
+            }
+          }'
